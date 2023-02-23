@@ -8,5 +8,7 @@ module.exports = {
     Cancle: require("./dl.cancle"),
     Download: require("./dl.download"),
     Remote: require("./dl.remote"),
+    Data: require("./dl.data"),
+    Success: require("./dl.success"),
   },
 };

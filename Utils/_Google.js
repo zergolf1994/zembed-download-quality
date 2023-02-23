@@ -158,6 +158,7 @@ exports.Source = async (file) => {
         } else {
           data.status = false;
         }
+        data.Authorization = headers.Authorization;
         resolve(data);
       });
     });

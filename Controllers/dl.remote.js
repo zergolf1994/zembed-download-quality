@@ -11,10 +11,10 @@ const { Sequelize, Op } = require("sequelize");
 
 module.exports = async (req, res) => {
   try {
-    const { slug } = req.query;
+    const { slug, quality } = req.query;
     let outputPath, storageId;
 
-    if (!slug) return res.json({ status: false });
+    if (!slug || !quality) return res.json({ status: false });
 
     let row = await Files.Lists.findOne({
       where: {
@@ -28,41 +28,17 @@ module.exports = async (req, res) => {
       raw: true,
       where: {
         fileId: row?.id,
-        type: "download",
+        type: "download-quality",
       },
     });
 
     if (!pc) return res.json({ status: false, msg: "not_exists" });
 
-    outputPath = `${global.dirPublic}${slug}/default`;
+    outputPath = `${global.dirPublic}${slug}/file_${quality}.mp4`;
 
     if (!fs.existsSync(outputPath)) {
       // cancle this video
       return res.json({ status: false, msg: "download_error" });
-    }
-    let video_data = await VideoData(outputPath);
-    let { size, format_name } = video_data?.format;
-    let ext,
-      file_update = {};
-
-    if (format_name.includes("mp4")) {
-      ext = "mp4";
-    } else if (format_name.includes("ts")) {
-      ext = "ts";
-    } else if (format_name.includes("matroska")) {
-      ext = "mkv";
-    } else if (format_name.includes("webm")) {
-      ext = "webm";
-    }
-
-    if (ext == "mp4" && (!row?.size || !row?.duration)) {
-      let { width, height, duration, codec_name } = video_data?.streams[0];
-      file_update.duration = duration?.toFixed(0) || 0;
-      file_update.size = size;
-
-      await Files.Lists.update(file_update, {
-        where: { id: row?.id },
-      });
     }
 
     let sg_db = await Storages.Lists.findOne({
@@ -112,21 +88,31 @@ module.exports = async (req, res) => {
         sv_storage[name] = value;
       }
     }
+
+    let video_data = await VideoData(outputPath);
+    let { size } = video_data?.format;
+    let { width, height } = video_data?.streams[0];
+
+    let vdo_data = {
+      active: 1,
+      type: "video",
+      name: quality,
+      value: `file_${quality}.mp4`,
+      mimetype: "video/mp4",
+      mimesize: `${width}x${height}`,
+      size: size,
+      storageId: sv_storage.id,
+      userId: pc?.userId,
+      fileId: pc?.fileId,
+    };
     await RemoteToStorage({
       file: outputPath,
-      save: `file_default.${ext}`,
+      save: `file_${quality}.mp4`,
       row: row,
       dir: `/home/files/${row.slug}`,
       sv_storage: sv_storage,
+      vdo_data,
     });
-
-    await Servers.Lists.update({ work: 0 }, { where: { id: pc?.serverId } });
-    await Process.destroy({ where: { id: pc?.id } });
-    shell.exec(
-      `sudo rm -rf ${global.dirPublic}${row?.slug}`,
-      { async: false, silent: false },
-      function (data) {}
-    );
 
     return res.json({ status: true });
   } catch (error) {
@@ -135,7 +121,7 @@ module.exports = async (req, res) => {
   }
 };
 
-function RemoteToStorage({ file, save, row, dir, sv_storage }) {
+function RemoteToStorage({ file, save, row, dir, sv_storage, vdo_data }) {
   return new Promise(async function (resolve, reject) {
     let sets = await getSets();
     let server = {
@@ -174,40 +160,32 @@ function RemoteToStorage({ file, save, row, dir, sv_storage }) {
         await client
           .uploadFile(file, uploadTo)
           .then(async (response) => {
-            let file_data = {
-              active: 1,
-              type: "video",
-              name: "default",
-              value: save,
-              fileId: row?.id,
-              storageId: sv_storage?.id,
-              userId: row?.userId,
-            };
 
             let video = await Files.Datas.findOne({
               raw: true,
               where: {
                 type: "video",
-                name: "default",
+                name: vdo_data?.name,
                 fileId: row?.id,
               },
             });
+
             if (video) {
               console.log("update");
-              await Files.Datas.update(file_data, {
+              await Files.Datas.update(vdo_data, {
                 where: {
                   id: video?.id,
                 },
               });
             } else {
               console.log("create");
-              await Files.Datas.create({ ...file_data });
+              await Files.Datas.create({ ...vdo_data });
             }
 
-            await Files.Lists.update(
+            /*await Files.Lists.update(
               { e_code: 0, s_video: 1 },
               { where: { id: row?.id } }
-            );
+            );*/
             // check disk
             request(
               { url: `http://${sv_storage?.sv_ip}/check-disk` },
@@ -217,20 +195,20 @@ function RemoteToStorage({ file, save, row, dir, sv_storage }) {
             );
 
             // disk-used
-            request(
+            /*request(
               { url: `http://${sets?.domain_api_admin}/cron/disk-used` },
               function (error, response, body) {
                 console.log("cron-thumbs", sets?.domain_api_admin);
               }
-            );
+            );*/
 
             // thumbs
-            request(
+            /*request(
               { url: `http://${sets?.domain_api_admin}/cron/thumbs` },
               function (error, response, body) {
                 console.log("cron-thumbs", sets?.domain_api_admin);
               }
-            );
+            );*/
 
             client.close();
             resolve(true);

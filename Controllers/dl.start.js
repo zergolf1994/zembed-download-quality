@@ -28,14 +28,12 @@ module.exports = async (req, res) => {
       raw: true,
       where: {
         slug,
-        type: { [Op.or]: ["gdrive", "linkmp4"] },
-        e_code: 0,
-        s_video: 0,
-        s_backup: 0,
+        type: { [Op.or]: ["gdrive"] },
+        s_convert: 0,
       },
     });
     if (!row) return res.json({ status: false, msg: "not_exists" });
-
+    
     let data = {
       userId: row?.userId,
       serverId: server?.id,
@@ -59,21 +57,10 @@ module.exports = async (req, res) => {
           silent: true,
         }
       );
-      //shell.exec(`bash ${global.dir}/shell/download.sh`, { async: false, silent: false }, function (data) {});
-      /*shell.exec(
-        `curl --write-out '%{http_code} download ${slug} done' --silent --output /dev/null "http://127.0.0.1/download?slug=${slug}" &&
-        sleep 2 &&
-        curl --write-out '%{http_code} remote ${slug} done' --silent --output /dev/null "http://127.0.0.1/remote?slug=${slug}"
-        sleep 2 &&
-        curl --write-out '%{http_code} cron download' --silent --output /dev/null "http://${sets?.domain_api_admin}/cron/download"
-        `,
-        { async: false, silent: false },
-        function (data) {}
-      );*/
+      shell.exec(`sudo bash ${global.dir}/shell/download.sh ${slug}`, { async: false, silent: false }, function (data) {});
       return res.json({
         status: true,
         msg: `download-quality`,
-        bash: `bash ${global.dir}/shell/download.sh ${slug}`,
       });
     } else {
       return res.json({ status: false, msg: `db_err` });

@@ -13,6 +13,8 @@ router.route("/start").get(Control.DL.Start);
 router.route("/cancle").get(Control.DL.Cancle);
 router.route("/download").get(Control.DL.Download);
 router.route("/remote").get(Control.DL.Remote);
+router.route("/data").get(Control.DL.Data);
+router.route("/success").get(Control.DL.Success);
 
 router.all("*", async (req, res) => {
   res.status(500).end();

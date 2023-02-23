@@ -21,7 +21,7 @@ module.exports = async (req, res) => {
       raw: true,
       where: {
         fileId: row?.id,
-        type: "download",
+        type: "download-quality",
       },
     });
 
@@ -36,7 +36,7 @@ module.exports = async (req, res) => {
     );
 
     await Files.Lists.update(
-      { e_code: 0 },
+      { e_code: 333 },
       {
         where: { id: pc.fileId },
         silent: true,
